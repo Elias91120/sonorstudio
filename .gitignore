@@ -1,0 +1,7 @@
+node_modules
+dist
+*.local
+.DS_Store
+
+# Outil de reverse engineering déposé à la racine, pas une dépendance du projet
+rea-main.zip

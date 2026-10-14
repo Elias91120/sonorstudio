@@ -1,0 +1,21 @@
+/** Canvas colors; they mirror the tokens in styles/app.css. */
+export const T = {
+  ink: '#15120f',
+  console: '#1e1b17',
+  cap: '#2a2621',
+  seam: '#3a342c',
+  paper: '#efe7da',
+  dust: '#a19789',
+  dust2: '#6f665b',
+  lamp: ['#ec5a3f', '#f3922f', '#f4c84a', '#f1ead9'],
+  gridBg: '#1b1815',
+  rowBlack: '#161310',
+  rowAlt: '#1d1a16',
+  octaveLine: 'rgba(239, 231, 218, 0.11)',
+  barLine: 'rgba(239, 231, 218, 0.17)',
+  beatLine: 'rgba(239, 231, 218, 0.075)',
+  stepLine: 'rgba(239, 231, 218, 0.035)',
+  ivoryKey: '#d9d0c1',
+  ebonyKey: '#2b2621',
+  font: '"Archivo Variable", Archivo, system-ui, sans-serif',
+};
