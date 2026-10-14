@@ -1,3 +1,4 @@
+import { migrateColor } from '../core/palette';
 import { makeMixer, makeTracks } from '../core/project';
 import type { Project } from '../core/types';
 
@@ -16,8 +17,8 @@ export function normalizeProject(data: unknown): Project | null {
     name: typeof p.name === 'string' && p.name ? p.name : 'Untitled',
     bpm: typeof p.bpm === 'number' ? Math.min(522, Math.max(10, p.bpm)) : 130,
     swing: typeof p.swing === 'number' ? p.swing : 0,
-    channels: p.channels,
-    patterns: p.patterns,
+    channels: p.channels.map((c) => ({ ...c, color: migrateColor(c.color ?? '') })),
+    patterns: p.patterns.map((pt) => ({ ...pt, color: migrateColor(pt.color ?? '') })),
     clips: Array.isArray(p.clips) ? p.clips : [],
     tracks,
     mixer,

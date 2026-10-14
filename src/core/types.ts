@@ -23,6 +23,8 @@ export interface SynthParams {
 
 export interface SamplerParams {
   sampleId: string;
+  /** Name of an imported sample, kept so the rack can say which one is missing after it was deleted. */
+  sampleName?: string;
   /** Semitones. */
   pitch: number;
   /** A new note stops the previous one (808s, open hats). */

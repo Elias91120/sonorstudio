@@ -10,6 +10,9 @@ export function setDragItem(e: DragEvent, item: LibraryItem) {
 
 export const hasDragItem = (e: DragEvent) => e.dataTransfer.types.includes(DND_TYPE);
 
+/** Files dragged in from the OS. The list itself is only readable on drop. */
+export const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes('Files');
+
 export function readDragItem(e: DragEvent): LibraryItem | null {
   try {
     const raw = e.dataTransfer.getData(DND_TYPE);

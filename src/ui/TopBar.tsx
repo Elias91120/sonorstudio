@@ -5,7 +5,7 @@ import { formatPosition } from '../core/time';
 import { addPattern, setBpm, updateMixerTrack } from '../state/actions';
 import { useStudio, type WinId } from '../state/store';
 import { Knob } from './controls';
-import { exportWav, loadDemo, newProject, openProjectFile, saveProjectFile } from './fileActions';
+import { exportProjectBundle, exportWav, loadDemo, newProject, openProjectFile, saveProjectFile } from './fileActions';
 import { setHint, useHint } from './hint';
 import { IconBrowser, IconKeyboard, IconMidi, IconMixer, IconPause, IconPiano, IconPlay, IconPlaylist, IconPlus, IconRack, IconStop } from './icons';
 import { enableMidi } from './midi';
@@ -47,6 +47,7 @@ function MainMenu() {
           { label: 'New project', onSelect: newProject },
           { label: 'Open project file…', onSelect: () => void openProjectFile() },
           { label: 'Save project file', shortcut: 'Ctrl+Shift+S', onSelect: saveProjectFile },
+          { label: 'Export project with sounds', onSelect: () => void exportProjectBundle() },
           { label: 'Export WAV', onSelect: () => void exportWav() },
           { separator: true },
           { label: 'Undo', shortcut: 'Ctrl+Z', disabled: st.past.length === 0, onSelect: st.undo },
@@ -57,10 +58,12 @@ function MainMenu() {
       }}
     >
       <span className="brand-mark" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-        <i />
+        <svg width="16" height="14" viewBox="0 0 16 14" fill="currentColor">
+          <rect x="0.5" y="3.5" width="2.8" height="7" rx="1.4" />
+          <rect x="4.6" y="0" width="2.8" height="14" rx="1.4" />
+          <rect x="8.7" y="1.4" width="2.8" height="11.2" rx="1.4" />
+          <rect x="12.8" y="4.2" width="2.8" height="5.6" rx="1.4" />
+        </svg>
       </span>
       <span className="brand-name">SonorStudio</span>
     </button>

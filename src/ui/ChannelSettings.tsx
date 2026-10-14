@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { engine } from '../audio/engine';
 import { getSound, onSoundsReady, soundsReady } from '../audio/soundBank';
 import { SOUNDS, SOUND_CATEGORIES } from '../audio/sounds';
+import { groupByFolder, isUserSampleId, useUserSamples } from '../audio/userSamples';
 import { formatParam } from '../core/fxSpecs';
 import { CONTENT_COLORS } from '../core/palette';
 import { DEFAULT_CHANNEL_VOLUME, formatDb, formatPan, formatPercent, volToGain } from '../core/project';
@@ -123,6 +124,10 @@ function listen(channelId: string) {
 }
 
 function SamplerPanel({ ch, sampler }: { ch: Channel; sampler: SamplerParams }) {
+  const samples = useUserSamples((s) => s.samples);
+  const loaded = useUserSamples((s) => s.loaded);
+  const mine = groupByFolder(samples);
+  const missing = loaded && isUserSampleId(sampler.sampleId) && !samples.some((s) => s.id === sampler.sampleId);
   return (
     <section className="cs-section">
       <h3 className="cs-title">Sample</h3>
@@ -145,6 +150,20 @@ function SamplerPanel({ ch, sampler }: { ch: Channel; sampler: SamplerParams }) 
               ))}
             </optgroup>
           ))}
+          {mine.map(({ folder, items }) => (
+            <optgroup key={folder} label={`My sounds: ${folder}`}>
+              {items.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+          {missing && (
+            <optgroup label="Missing">
+              <option value={sampler.sampleId}>{sampler.sampleName ?? ch.name} (deleted from your library)</option>
+            </optgroup>
+          )}
         </select>
         <button className="btn" onClick={() => listen(ch.id)}>
           Listen
@@ -184,15 +203,18 @@ function useSoundsLoaded() {
 function Waveform({ soundId, color }: { soundId: string; color: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const ready = useSoundsLoaded();
+  // Imported samples arrive later than the built-in bank, and can be deleted: redraw whenever the library changes.
+  const samples = useUserSamples((s) => s.samples);
   useEffect(() => {
     const canvas = ref.current;
     const buf = getSound(soundId);
-    if (!canvas || !buf) return;
+    if (!canvas) return;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     const c = prepareCanvas(canvas, w, h);
     if (!c) return;
     c.clearRect(0, 0, w, h);
+    if (!buf) return;
     const data = buf.getChannelData(0);
     const per = Math.max(1, Math.floor(data.length / w));
     c.fillStyle = color;
@@ -208,7 +230,7 @@ function Waveform({ soundId, color }: { soundId: string; color: string }) {
       const y1 = ((1 - lo) / 2) * h;
       c.fillRect(x, y0, 1, Math.max(1, y1 - y0));
     }
-  }, [soundId, color, ready]);
+  }, [soundId, color, ready, samples]);
   return <canvas className="waveform" ref={ref} aria-label="Waveform of the sample" role="img" />;
 }
 

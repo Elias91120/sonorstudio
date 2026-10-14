@@ -22,7 +22,7 @@ import { SnapPicker, ToolPicker, ZoomButtons, type Tool } from './editorTools';
 import { setHint } from './hint';
 import { IconFollow, IconPlus } from './icons';
 import { askText, openMenu } from './overlay';
-import { T } from './theme';
+import { alpha, drawPlayhead, T } from './theme';
 import { clamp, prepareCanvas, startDrag, useElementSize, useFrame, useNativeWheel } from './util';
 
 const TRACK_H = 44;
@@ -557,36 +557,32 @@ function drawGrid(canvas: HTMLCanvasElement | null, w: number, h: number, sx: nu
   const c = prepareCanvas(canvas, w, h);
   if (!c) return;
   const z = L.zoom;
-  c.fillStyle = T.gridBg;
+  c.fillStyle = T.floor;
   c.fillRect(0, 0, w, h);
   const first = Math.floor(sy / TRACK_H);
   const last = Math.min(L.tracks.length - 1, Math.floor((sy + h) / TRACK_H));
   for (let t = first; t <= last; t++) {
     const y = t * TRACK_H - sy;
-    if (t % 2 === 1) {
-      c.fillStyle = T.rowAlt;
-      c.fillRect(0, y, w, TRACK_H);
-    }
     if (L.tracks[t]?.muted) {
-      c.fillStyle = 'rgba(8, 6, 4, 0.35)';
+      c.fillStyle = 'rgba(6, 8, 12, 0.45)';
       c.fillRect(0, y, w, TRACK_H);
     }
-    c.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    c.fillStyle = T.trackLine;
     c.fillRect(0, y + TRACK_H - 1, w, 1);
   }
   const unit = BEAT * z >= 10 ? BEAT : BAR;
   for (let t = Math.floor(sx / z / unit) * unit; t * z - sx <= w; t += unit) {
     const x = Math.round(t * z - sx);
-    c.fillStyle = t % BAR === 0 ? (t % (4 * BAR) === 0 ? 'rgba(239, 231, 218, 0.2)' : T.barLine) : T.beatLine;
+    c.fillStyle = t % BAR === 0 ? (t % (4 * BAR) === 0 ? T.barLine : T.playlistBar) : T.playlistBeat;
     c.fillRect(x, 0, 1, h);
   }
   const end = L.songLen * z - sx;
   if (end < w && L.clips.length > 0) {
-    c.fillStyle = 'rgba(8, 6, 4, 0.3)';
+    c.fillStyle = 'rgba(6, 8, 12, 0.35)';
     c.fillRect(Math.max(0, end), 0, w - Math.max(0, end), h);
   }
 
-  c.font = `600 10px ${T.font}`;
+  c.font = `600 10.5px ${T.font}`;
   c.textBaseline = 'middle';
   c.textAlign = 'left';
   for (const clip of L.clips) {
@@ -595,111 +591,117 @@ function drawGrid(canvas: HTMLCanvasElement | null, w: number, h: number, sx: nu
     const cw = Math.max(4, clip.len * z);
     if (x > w || x + cw < 0 || y > h || y + TRACK_H < 0) continue;
     const shape = L.shapes.get(clip.patternId);
-    const color = shape?.pattern.color ?? T.dust;
+    const color = shape?.pattern.color ?? T.text3;
     const muted = clip.muted || L.tracks[clip.track]?.muted;
-    const top = y + 2;
-    const ch = TRACK_H - 4;
+    const selected = L.selection.has(clip.id);
+    const top = y + 3;
+    const ch = TRACK_H - 6;
     c.save();
-    c.beginPath();
-    c.roundRect(x + 1, top, cw - 2, ch, 4);
-    c.clip();
-    c.globalAlpha = muted ? 0.35 : 1;
-    c.fillStyle = '#26221d';
-    c.fillRect(x, top, cw, ch);
-    c.globalAlpha = muted ? 0.12 : 0.2;
-    c.fillStyle = color;
-    c.fillRect(x, top, cw, ch);
     c.globalAlpha = muted ? 0.4 : 1;
+    if (selected) {
+      c.shadowColor = T.lampGlow;
+      c.shadowBlur = 12;
+    }
+    c.beginPath();
+    c.roundRect(x + 1, top, cw - 2, ch, 6);
+    c.fillStyle = alpha(color, 0.13);
+    c.fill();
+    c.shadowBlur = 0;
+    c.clip();
     c.fillStyle = color;
     c.fillRect(x, top, cw, 14);
+    // The glint along the header, as on the steps and the windows.
+    c.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    c.fillRect(x + 2, top, cw - 4, 1);
     if (cw > 24 && shape) {
-      c.fillStyle = 'rgba(21, 18, 15, 0.9)';
-      c.fillText(shape.pattern.name, x + 6, top + 7.5);
+      c.fillStyle = T.onColor;
+      c.fillText(shape.pattern.name, x + 7, top + 7.5);
     }
     if (shape && shape.notes.length) {
       const range = Math.max(1, shape.hi - shape.lo);
-      const bodyTop = top + 17;
-      const bodyH = ch - 21;
-      c.fillStyle = color;
+      const bodyTop = top + 18;
+      const bodyH = ch - 22;
+      c.fillStyle = alpha(color, 0.85);
       // Patterns longer than the clip are cut; shorter ones leave empty space, as in FL Studio.
       for (const n of shape.notes) {
         if (n.pos < clip.offset || n.pos >= clip.offset + clip.len) continue;
         const nx = x + (n.pos - clip.offset) * z;
-        const nw = Math.max(1.5, Math.min(n.len, clip.offset + clip.len - n.pos) * z - 0.5);
+        const nw = Math.max(2, Math.min(n.len, clip.offset + clip.len - n.pos) * z - 0.5);
         const ny = shape.hi === shape.lo ? bodyTop + bodyH / 2 - 1 : bodyTop + ((shape.hi - n.key) / range) * (bodyH - 2);
-        c.fillRect(nx, ny, nw, 2);
+        c.beginPath();
+        c.roundRect(nx, ny, nw, 2, 1);
+        c.fill();
       }
     }
     c.restore();
-    c.lineWidth = L.selection.has(clip.id) ? 1.5 : 1;
-    c.strokeStyle = L.selection.has(clip.id) ? T.paper : 'rgba(0, 0, 0, 0.45)';
+    c.save();
+    c.globalAlpha = muted ? 0.4 : 1;
+    c.lineWidth = selected ? 1.5 : 1;
+    c.strokeStyle = selected ? T.lamp : alpha(color, 0.32);
     c.beginPath();
-    c.roundRect(x + 1.5, top + 0.5, cw - 3, ch - 1, 4);
+    c.roundRect(x + 1.5, top + 0.5, cw - 3, ch - 1, 6);
     c.stroke();
+    c.restore();
   }
 
   if (sel) {
     const x = Math.min(sel.x0, sel.x1) - sx;
     const y = Math.min(sel.y0, sel.y1) - sy;
-    c.fillStyle = 'rgba(239, 231, 218, 0.06)';
+    c.fillStyle = 'rgba(120, 174, 255, 0.1)';
     c.fillRect(x, y, Math.abs(sel.x1 - sel.x0), Math.abs(sel.y1 - sel.y0));
-    c.strokeStyle = 'rgba(239, 231, 218, 0.7)';
+    c.strokeStyle = T.accent;
     c.lineWidth = 1;
     c.setLineDash([3, 3]);
     c.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5, Math.abs(sel.x1 - sel.x0), Math.abs(sel.y1 - sel.y0));
     c.setLineDash([]);
   }
-  if (playPos >= 0) {
-    const x = Math.round(playPos * z - sx) + 0.5;
-    c.strokeStyle = T.paper;
-    c.lineWidth = 1;
-    c.beginPath();
-    c.moveTo(x, 0);
-    c.lineTo(x, h);
-    c.stroke();
-  }
+  if (playPos >= 0) drawPlayhead(c, Math.round(playPos * z - sx) + 0.5, h);
 }
 
 function drawRuler(canvas: HTMLCanvasElement | null, w: number, sx: number, L: Live, playPos: number) {
   const c = prepareCanvas(canvas, w, RULER_H);
   if (!c) return;
   const z = L.zoom;
-  c.fillStyle = T.console;
+  c.fillStyle = T.ruler;
   c.fillRect(0, 0, w, RULER_H);
-  c.fillStyle = T.seam;
+  c.fillStyle = T.hair;
   c.fillRect(0, RULER_H - 1, w, 1);
   const barPx = BAR * z;
   const every = [1, 2, 4, 8, 16].find((n) => n * barPx >= 34) ?? 32;
-  c.font = `600 10px ${T.font}`;
+  c.font = `600 11px ${T.font}`;
   c.textBaseline = 'middle';
   c.textAlign = 'left';
   for (let b = Math.floor(sx / barPx); b * barPx - sx <= w; b++) {
     const x = Math.round(b * barPx - sx);
     const labelled = b % every === 0;
-    c.fillStyle = 'rgba(239, 231, 218, 0.26)';
+    c.fillStyle = T.rulerLine;
     c.fillRect(x, labelled ? 6 : 15, 1, RULER_H);
     if (labelled) {
-      c.fillStyle = b * BAR < L.songLen ? T.paper : T.dust2;
-      c.fillText(String(b + 1), x + 4, 11);
+      c.fillStyle = b * BAR < L.songLen ? T.text2 : T.text3;
+      c.fillText(String(b + 1), x + 6, 12);
     }
   }
   const sx0 = L.songStart * z - sx;
   if (sx0 >= -6 && sx0 <= w) {
-    c.fillStyle = T.lamp[1];
+    c.fillStyle = T.text2;
     c.beginPath();
     c.moveTo(sx0, RULER_H - 1);
-    c.lineTo(sx0, RULER_H - 11);
-    c.lineTo(sx0 + 7, RULER_H - 6);
+    c.lineTo(sx0, RULER_H - 10);
+    c.lineTo(sx0 + 6, RULER_H - 5.5);
     c.closePath();
     c.fill();
   }
   if (playPos >= 0) {
     const x = playPos * z - sx;
-    c.fillStyle = T.paper;
+    c.save();
+    c.fillStyle = T.lamp;
+    c.shadowColor = T.lampGlow;
+    c.shadowBlur = 6;
     c.beginPath();
-    c.moveTo(x - 5, 0);
-    c.lineTo(x + 5, 0);
+    c.moveTo(x - 4.5, 0);
+    c.lineTo(x + 4.5, 0);
     c.lineTo(x, 7);
     c.fill();
+    c.restore();
   }
 }

@@ -3,6 +3,7 @@ import type { Project } from '../core/types';
 import { AudioGraph } from './graph';
 import { loadSounds } from './soundBank';
 import { buildPatternTimeline, buildSongTimeline } from './timeline';
+import { loadUserSamples } from './userSamples';
 import { triggerNote, type Voice } from './voices';
 
 const SAMPLE_RATE = 44100;
@@ -10,7 +11,7 @@ const SAMPLE_RATE = 44100;
 const TAIL = 3;
 
 export async function renderProject(project: Project, mode: 'pattern' | 'song', patternId: string): Promise<AudioBuffer> {
-  await loadSounds();
+  await Promise.all([loadSounds(), loadUserSamples()]);
   const tl = mode === 'song' ? buildSongTimeline(project) : buildPatternTimeline(project, patternId);
   const spt = secondsPerTick(project.bpm);
   const ctx = new OfflineAudioContext(2, Math.ceil((tl.length * spt + TAIL) * SAMPLE_RATE), SAMPLE_RATE);

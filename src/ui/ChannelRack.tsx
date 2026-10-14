@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { engine } from '../audio/engine';
+import { isUserSampleId, useUserSamples } from '../audio/userSamples';
 import { PRESET_NAMES } from '../core/presets';
 import { DEFAULT_CHANNEL_VOLUME, fitsSteps, formatDb, formatPan, formatPercent, patternLength, volToGain } from '../core/project';
 import { STEP } from '../core/time';
@@ -24,8 +25,9 @@ import {
 } from '../state/actions';
 import { useStudio } from '../state/store';
 import { Knob, Led } from './controls';
-import { hasDragItem, readDragItem } from './dnd';
+import { hasDragItem, hasFiles, readDragItem } from './dnd';
 import { IconPlus } from './icons';
+import { droppedFiles, importToRack } from './importSounds';
 import { askText, openMenu, openMenuBelow } from './overlay';
 import { clamp, startDrag, useFrame, useNativeWheel } from './util';
 
@@ -51,6 +53,8 @@ export function ChannelRack() {
   const swing = useStudio((s) => s.project.swing);
   const mixerSize = useStudio((s) => s.project.mixer.length);
   const [dropping, setDropping] = useState(false);
+  const grid = useRef<HTMLDivElement>(null);
+  useCurrentColumn(grid, pattern?.id ?? '');
   if (!pattern) return null;
   const steps = patternLength(pattern) / STEP;
 
@@ -58,7 +62,7 @@ export function ChannelRack() {
     <div
       className={`rack${dropping ? ' is-drop' : ''}`}
       onDragOver={(e) => {
-        if (!hasDragItem(e)) return;
+        if (!hasDragItem(e) && !hasFiles(e)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
         setDropping(true);
@@ -68,6 +72,11 @@ export function ChannelRack() {
       }}
       onDrop={(e) => {
         setDropping(false);
+        if (hasFiles(e)) {
+          e.preventDefault();
+          void droppedFiles(e.dataTransfer).then((files) => importToRack(files));
+          return;
+        }
         const item = readDragItem(e);
         if (!item) return;
         e.preventDefault();
@@ -82,7 +91,7 @@ export function ChannelRack() {
         </span>
       </div>
       <div className="rack-body">
-        <div className="rack-grid" style={{ '--steps': steps } as CSSProperties}>
+        <div className="rack-grid" ref={grid} style={{ '--steps': steps } as CSSProperties}>
           <div className="rack-row is-leds">
             <div className="rack-ctrl" />
             <StepLeds patternId={pattern.id} steps={steps} />
@@ -152,12 +161,30 @@ function useCurrentStep(patternId: string) {
   return step;
 }
 
+/**
+ * Lights the column of the step being played, on the DOM directly: re-rendering every row several
+ * times a second for one attribute would be wasted work. React leaves the attribute alone.
+ */
+function useCurrentColumn(grid: RefObject<HTMLDivElement | null>, patternId: string) {
+  const lit = useRef(-1);
+  useFrame(() => {
+    const el = grid.current;
+    if (!el) return;
+    const pos = engine.patternPosition(patternId);
+    const cur = pos < 0 ? -1 : Math.floor(pos / STEP);
+    if (cur === lit.current) return;
+    el.querySelectorAll('.step[data-cur]').forEach((s) => s.removeAttribute('data-cur'));
+    if (cur >= 0) el.querySelectorAll(`.steps > .step:nth-child(${cur + 1})`).forEach((s) => s.setAttribute('data-cur', ''));
+    lit.current = cur;
+  });
+}
+
 function StepLeds({ patternId, steps }: { patternId: string; steps: number }) {
   const current = useCurrentStep(patternId);
   return (
     <div className="steps" aria-hidden="true">
       {Array.from({ length: steps }, (_, i) => (
-        <span key={i} className={`step-led${i === current ? ' is-on' : ''}`} data-group={Math.floor(i / 4) % 4} />
+        <span key={i} className={`step-led${i === current ? ' is-on' : ''}`} />
       ))}
     </div>
   );
@@ -176,6 +203,9 @@ function ChannelRow({ ch, pattern, steps, selected, mixerSize }: RowProps) {
   const asSteps = fitsSteps(notes);
   const on = useMemo(() => new Set(asSteps && notes ? notes.map((n) => n.pos / STEP) : []), [notes, asSteps]);
   const [dropping, setDropping] = useState(false);
+  const sampleId = ch.sampler?.sampleId ?? '';
+  // Only once the library is read: before that, every imported sample would look missing.
+  const missing = useUserSamples((s) => s.loaded && isUserSampleId(sampleId) && !s.samples.some((x) => x.id === sampleId));
 
   const onStepDown = (e: ReactPointerEvent, i: number) => {
     if (e.button !== 0 && e.button !== 2) return;
@@ -220,7 +250,7 @@ function ChannelRow({ ch, pattern, steps, selected, mixerSize }: RowProps) {
     <div
       className={`rack-row${selected ? ' is-selected' : ''}${dropping ? ' is-drop' : ''}${ch.muted ? ' is-muted' : ''}`}
       onDragOver={(e) => {
-        if (!hasDragItem(e)) return;
+        if (!hasDragItem(e) && !hasFiles(e)) return;
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = 'copy';
@@ -229,6 +259,12 @@ function ChannelRow({ ch, pattern, steps, selected, mixerSize }: RowProps) {
       onDragLeave={() => setDropping(false)}
       onDrop={(e) => {
         setDropping(false);
+        if (hasFiles(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+          void droppedFiles(e.dataTransfer).then((files) => importToRack(files, ch.id));
+          return;
+        }
         const item = readDragItem(e);
         if (!item) return;
         e.preventDefault();
@@ -257,9 +293,13 @@ function ChannelRow({ ch, pattern, steps, selected, mixerSize }: RowProps) {
         />
         <TrackNumber value={ch.mixerTrack} max={mixerSize - 1} onChange={(v) => setChannelTrack(ch.id, v)} />
         <button
-          className="rack-name"
+          className={`rack-name${missing ? ' is-missing' : ''}`}
           style={{ '--c': ch.color } as CSSProperties}
-          data-hint={`${ch.name}: click for settings, right-click for more`}
+          data-hint={
+            missing
+              ? `Sample missing: ${ch.sampler?.sampleName ?? ch.name}. Import it again, or pick another sample in the channel settings.`
+              : `${ch.name}: click for settings, right-click for more`
+          }
           onClick={() => openChannelSettings(ch.id)}
           onContextMenu={menu}
         >
@@ -274,12 +314,11 @@ function ChannelRow({ ch, pattern, steps, selected, mixerSize }: RowProps) {
         />
       </div>
       {asSteps ? (
-        <div className="steps" onContextMenu={(e) => e.preventDefault()}>
+        <div className="steps" style={{ '--c': ch.color } as CSSProperties} onContextMenu={(e) => e.preventDefault()}>
           {Array.from({ length: steps }, (_, i) => (
             <button
               key={i}
               className="step"
-              data-group={Math.floor(i / 4) % 4}
               aria-pressed={on.has(i)}
               aria-label={`${ch.name}, step ${i + 1}`}
               onPointerDown={(e) => onStepDown(e, i)}

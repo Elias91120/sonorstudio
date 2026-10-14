@@ -1,12 +1,11 @@
 import { current, type Draft } from 'immer';
-import { SOUNDS_BY_ID } from '../audio/sounds';
 import { uid } from '../core/ids';
 import { nextColor } from '../core/palette';
 import { isDefaultInsertName, nextFreeInsert, patternLength } from '../core/project';
 import { presetParams } from '../core/presets';
 import { BAR, STEP, ceilTo } from '../core/time';
 import type { Channel, FxType, MixerTrack, Project, SamplerParams, SynthParams, OscParams } from '../core/types';
-import { makeFx, makeNote, makePattern, samplerChannel, synthChannel } from './factory';
+import { makeFx, makeNote, makePattern, samplerChannel, samplerParams, synthChannel } from './factory';
 import { useStudio } from './store';
 
 const S = () => useStudio.getState();
@@ -18,40 +17,65 @@ export type LibraryItem = { kind: 'sample'; id: string } | { kind: 'synth'; pres
 
 /* Channels */
 
+function swapSound(ch: Draft<Channel>, item: LibraryItem) {
+  if (item.kind === 'sample') {
+    const { name, sampler } = samplerParams(item.id);
+    ch.type = 'sampler';
+    ch.sampler = sampler;
+    ch.synth = undefined;
+    ch.preset = undefined;
+    ch.name = name ?? ch.name;
+  } else {
+    ch.type = 'synth';
+    ch.synth = presetParams(item.preset);
+    ch.preset = item.preset;
+    ch.sampler = undefined;
+    ch.name = item.preset;
+  }
+}
+
+/** Appends a channel on the next free insert, naming the insert after it like FL Studio does. */
+function pushChannel(d: Draft<Project>, item: LibraryItem): string {
+  const track = nextFreeInsert(d.channels, d.mixer.length);
+  const ch =
+    item.kind === 'sample' ? samplerChannel(item.id, d.channels.length, track) : synthChannel(item.preset, d.channels.length, track);
+  d.channels.push(ch);
+  const insert = d.mixer[track];
+  if (track > 0 && insert && isDefaultInsertName(insert.name, track)) insert.name = ch.name;
+  return ch.id;
+}
+
 /** Adds a channel for a library item, or swaps the sound of `replaceId`. */
 export function addChannel(item: LibraryItem, replaceId?: string) {
   let added: string | null = null;
   S().commit((d) => {
     if (replaceId) {
       const ch = findChannel(d, replaceId);
-      if (!ch) return;
-      if (item.kind === 'sample') {
-        const sound = SOUNDS_BY_ID.get(item.id);
-        ch.type = 'sampler';
-        ch.sampler = { sampleId: item.id, pitch: 0, cutItself: sound?.category === '808s' };
-        ch.synth = undefined;
-        ch.preset = undefined;
-        ch.name = sound?.name ?? ch.name;
-      } else {
-        ch.type = 'synth';
-        ch.synth = presetParams(item.preset);
-        ch.preset = item.preset;
-        ch.sampler = undefined;
-        ch.name = item.preset;
-      }
+      if (ch) swapSound(ch, item);
       return;
     }
-    const track = nextFreeInsert(d.channels, d.mixer.length);
-    const ch =
-      item.kind === 'sample'
-        ? samplerChannel(item.id, d.channels.length, track)
-        : synthChannel(item.preset, d.channels.length, track);
-    d.channels.push(ch);
-    const insert = d.mixer[track];
-    if (track > 0 && insert && isDefaultInsertName(insert.name, track)) insert.name = ch.name;
-    added = ch.id;
+    added = pushChannel(d, item);
   });
   if (added) S().selectChannel(added);
+}
+
+/**
+ * One channel per sample, in order, as a single undo step. The first sample takes over `replaceId`'s
+ * row when that channel still exists (an import can outlive the row it was dropped on).
+ */
+export function addSampleChannels(ids: string[], replaceId?: string) {
+  if (!ids.length) return;
+  let last: string | null = null;
+  S().commit((d) => {
+    const target = replaceId ? findChannel(d, replaceId) : undefined;
+    const rest = target ? ids.slice(1) : ids;
+    if (target) {
+      swapSound(target, { kind: 'sample', id: ids[0] });
+      last = target.id;
+    }
+    for (const id of rest) last = pushChannel(d, { kind: 'sample', id });
+  });
+  if (last) S().selectChannel(last);
 }
 
 export function updateChannel(id: string, patch: Partial<Channel>) {

@@ -1,5 +1,7 @@
 import { engine } from '../audio/engine';
 import { encodeWav, peakOf, renderProject } from '../audio/exportWav';
+import { importCandidates, loadUserSamples } from '../audio/userSamples';
+import { isProjectZip, packProject, PROJECT_ZIP_SUFFIX, unpackProject } from '../state/bundle';
 import { createDemoProject } from '../state/demo';
 import { createEmptyProject } from '../state/factory';
 import { normalizeProject, storeProject } from '../state/storage';
@@ -30,6 +32,17 @@ export function saveProjectFile() {
   setHint('Project file downloaded.');
 }
 
+/** A .sonor.zip with the imported sounds inside, for another browser or another person. */
+export async function exportProjectBundle() {
+  // The library loads in the background at startup; packing before it is ready would leave the sounds out.
+  await loadUserSamples();
+  const p = useStudio.getState().project;
+  const { blob, sounds, missing } = packProject(p);
+  downloadBlob(blob, `${slug(p.name)}${PROJECT_ZIP_SUFFIX}`);
+  const packed = sounds ? `${sounds} sound${sounds === 1 ? '' : 's'}` : 'no imported sound';
+  setHint(missing ? `Project exported with ${packed}; ${missing} missing from your library could not be included.` : `Project exported with ${packed}.`);
+}
+
 function pickFile(accept: string): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
@@ -42,9 +55,25 @@ function pickFile(accept: string): Promise<File | null> {
 }
 
 export async function openProjectFile() {
-  const file = await pickFile('.json,application/json');
+  const file = await pickFile('.json,.zip,application/json,application/zip');
   if (!file) return;
   try {
+    if (isProjectZip(file)) {
+      const bundle = unpackProject(new Uint8Array(await file.arrayBuffer()));
+      const p = bundle && normalizeProject(bundle.project);
+      if (!p) throw new Error('not a project');
+      // The sounds go in first so the channels find them the moment the project shows up.
+      const restored = bundle.sounds.length ? await importCandidates(bundle.sounds) : null;
+      engine.stop();
+      useStudio.getState().loadProject(p, 'pattern');
+      const n = restored ? restored.added.length : 0;
+      let text = n ? `Opened ${p.name}, ${n} sound${n === 1 ? '' : 's'} added to your library.` : `Opened ${p.name}.`;
+      const lost = bundle.skipped.length + (restored?.skipped.length ?? 0);
+      if (lost) text += ` ${lost} sound${lost === 1 ? '' : 's'} couldn't be restored and will show as missing.`;
+      if (restored?.storageError) text += ` ${restored.storageError}`;
+      setHint(text);
+      return;
+    }
     const p = normalizeProject(JSON.parse(await file.text()));
     if (!p) throw new Error('not a project');
     engine.stop();

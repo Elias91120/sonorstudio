@@ -10,13 +10,13 @@ import { useEditorKeys } from './editorKeys';
 import { SnapPicker, ToolPicker, ZoomButtons, type Tool } from './editorTools';
 import { setHint } from './hint';
 import { IconGhost } from './icons';
-import { T } from './theme';
+import { drawPlayhead, T, tint } from './theme';
 import { clamp, prepareCanvas, startDrag, useElementSize, useFrame, useNativeWheel } from './util';
 
 const KEY_H = 13;
 const KB_W = 56;
 const RULER_H = 22;
-const VEL_H = 72;
+const VEL_H = 64;
 const VEL_BASE = VEL_H - 5;
 const VEL_SPAN = VEL_H - 14;
 const EMPTY_NOTES: Note[] = [];
@@ -86,8 +86,8 @@ export function PianoRoll() {
       .flatMap(([, ns]) => ns);
   }, [pattern, channelId, ghosts]);
   const patLen = pattern ? patternLength(pattern) : BAR;
-  const live = useRef<Live>({ notes, ghosts: ghostNotes, selection, zoom, patLen, color: T.dust, patternId: '' });
-  live.current = { notes, ghosts: ghostNotes, selection, zoom, patLen, color: channel?.color ?? T.dust, patternId: pattern?.id ?? '' };
+  const live = useRef<Live>({ notes, ghosts: ghostNotes, selection, zoom, patLen, color: T.text3, patternId: '' });
+  live.current = { notes, ghosts: ghostNotes, selection, zoom, patLen, color: channel?.color ?? T.text3, patternId: pattern?.id ?? '' };
   dirty.current = true;
 
   // Center the view on the channel's notes (or C5) when switching channels.
@@ -612,18 +612,21 @@ function drawGrid(canvas: HTMLCanvasElement | null, w: number, h: number, sx: nu
   }
   const end = L.patLen * z - sx;
   if (end < w) {
-    c.fillStyle = 'rgba(8, 6, 4, 0.42)';
+    c.fillStyle = T.pastEnd;
     c.fillRect(Math.max(0, end), 0, w - Math.max(0, end), h);
   }
-  c.strokeStyle = 'rgba(239, 231, 218, 0.2)';
+  // Ghosts are drawn first, as bare outlines, so the channel's own notes always sit on top.
+  c.strokeStyle = T.ghost;
   for (const n of L.ghosts) {
     const x = n.pos * z - sx;
     const y = keyY(n.key, sy);
     const nw = Math.max(3, n.len * z);
     if (x > w || x + nw < 0 || y > h || y + KEY_H < 0) continue;
-    c.strokeRect(Math.round(x) + 0.5, y + 1.5, Math.max(2, nw - 1), KEY_H - 3);
+    c.beginPath();
+    c.roundRect(Math.round(x) + 0.5, y + 1.5, Math.max(2, nw - 1), KEY_H - 3, 3);
+    c.stroke();
   }
-  c.font = `600 9px ${T.font}`;
+  c.font = `600 10px ${T.font}`;
   c.textBaseline = 'middle';
   c.textAlign = 'left';
   for (const n of L.notes) {
@@ -632,17 +635,36 @@ function drawGrid(canvas: HTMLCanvasElement | null, w: number, h: number, sx: nu
     const nw = Math.max(4, n.len * z);
     if (x > w || x + nw < 0 || y > h || y + KEY_H < 0) continue;
     const selected = L.selection.has(n.id);
-    c.globalAlpha = 0.45 + 0.55 * n.vel;
-    c.fillStyle = selected ? T.paper : L.color;
+    c.save();
+    c.globalAlpha = 0.5 + 0.5 * n.vel;
+    if (selected) {
+      c.shadowColor = T.lampGlow;
+      c.shadowBlur = 10;
+    } else {
+      c.shadowColor = 'rgba(0, 0, 0, 0.35)';
+      c.shadowOffsetY = 1;
+      c.shadowBlur = 1;
+    }
+    c.fillStyle = selected ? tint(L.color, 0.28) : L.color;
     c.beginPath();
-    c.roundRect(x + 0.5, y + 1, nw - 1, KEY_H - 2, 2.5);
+    c.roundRect(x + 0.5, y + 1, nw - 1, KEY_H - 2, 3);
     c.fill();
-    c.globalAlpha = 1;
-    c.fillStyle = 'rgba(21, 18, 15, 0.35)';
-    c.fillRect(x + nw - 3.5, y + 3, 1.5, KEY_H - 6);
-    if (nw > 28) {
-      c.fillStyle = 'rgba(21, 18, 15, 0.85)';
-      c.fillText(noteName(n.key), x + 4, y + KEY_H / 2 + 0.5);
+    c.restore();
+    // Light catches the top edge of each note, like the lit steps in the rack.
+    c.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    c.fillRect(x + 2, y + 1.5, Math.max(0, nw - 4), 1);
+    if (selected) {
+      c.strokeStyle = T.lamp;
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.roundRect(x + 0.5, y + 1, nw - 1, KEY_H - 2, 3);
+      c.stroke();
+      c.lineWidth = 1;
+    }
+    const label = noteName(n.key);
+    if (nw >= c.measureText(label).width + 10) {
+      c.fillStyle = T.onColor;
+      c.fillText(label, x + 5, y + KEY_H / 2 + 0.5);
     }
   }
   if (sel) {
@@ -650,21 +672,14 @@ function drawGrid(canvas: HTMLCanvasElement | null, w: number, h: number, sx: nu
     const y = Math.min(sel.y0, sel.y1) - sy;
     const rw = Math.abs(sel.x1 - sel.x0);
     const rh = Math.abs(sel.y1 - sel.y0);
-    c.fillStyle = 'rgba(239, 231, 218, 0.06)';
+    c.fillStyle = 'rgba(120, 174, 255, 0.1)';
     c.fillRect(x, y, rw, rh);
-    c.strokeStyle = 'rgba(239, 231, 218, 0.7)';
+    c.strokeStyle = T.accent;
     c.setLineDash([3, 3]);
     c.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5, rw, rh);
     c.setLineDash([]);
   }
-  if (playPos >= 0) {
-    const x = Math.round(playPos * z - sx) + 0.5;
-    c.strokeStyle = T.paper;
-    c.beginPath();
-    c.moveTo(x, 0);
-    c.lineTo(x, h);
-    c.stroke();
-  }
+  if (playPos >= 0) drawPlayhead(c, Math.round(playPos * z - sx) + 0.5, h);
 }
 
 function drawKeys(canvas: HTMLCanvasElement | null, h: number, sy: number, pressed: number | null) {
@@ -674,28 +689,35 @@ function drawKeys(canvas: HTMLCanvasElement | null, h: number, sy: number, press
   c.fillRect(0, 0, KB_W, h);
   const top = Math.min(KEY_COUNT - 1, KEY_COUNT - 1 - Math.floor(sy / KEY_H));
   const bottom = Math.max(0, KEY_COUNT - 1 - Math.floor((sy + h) / KEY_H));
-  c.font = `600 9px ${T.font}`;
+  c.font = `600 10px ${T.font}`;
   c.textBaseline = 'middle';
   c.textAlign = 'right';
   for (let k = bottom; k <= top; k++) {
     const y = keyY(k, sy);
     if (isBlackKey(k)) {
-      c.fillStyle = k === pressed ? T.lamp[1] : T.ebonyKey;
-      c.fillRect(0, y + 1, KB_W * 0.6, KEY_H - 2);
+      c.fillStyle = k === pressed ? T.accent : T.ebonyKey;
+      c.beginPath();
+      c.roundRect(0, y + 1, 34, KEY_H - 2, [0, 2, 2, 0]);
+      c.fill();
+      c.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      c.fillRect(0, y + KEY_H - 2, 34, 1);
       continue;
     }
     if (k === pressed) {
-      c.fillStyle = T.lamp[1];
+      c.fillStyle = T.accent;
       c.fillRect(0, y, KB_W, KEY_H);
     }
-    c.fillStyle = 'rgba(21, 18, 15, 0.22)';
-    c.fillRect(0, y + KEY_H - 1, KB_W, 1);
+    // Two white keys side by side (E-F, B-C) need a seam; elsewhere a black key separates them.
+    if (k % 12 === 0 || k % 12 === 5) {
+      c.fillStyle = T.keySeam;
+      c.fillRect(0, y + KEY_H - 1, KB_W, 1);
+    }
     if (k % 12 === 0) {
-      c.fillStyle = '#4a4238';
-      c.fillText(noteName(k), KB_W - 5, y + KEY_H / 2);
+      c.fillStyle = T.keyLabel;
+      c.fillText(noteName(k), KB_W - 6, y + KEY_H / 2);
     }
   }
-  c.fillStyle = T.seam;
+  c.fillStyle = 'rgba(0, 0, 0, 0.4)';
   c.fillRect(KB_W - 1, 0, 1, h);
 }
 
@@ -703,46 +725,50 @@ function drawRuler(canvas: HTMLCanvasElement | null, w: number, sx: number, L: L
   const c = prepareCanvas(canvas, w, RULER_H);
   if (!c) return;
   const z = L.zoom;
-  c.fillStyle = T.console;
+  c.fillStyle = T.ruler;
   c.fillRect(0, 0, w, RULER_H);
-  c.fillStyle = T.seam;
+  c.fillStyle = T.hair;
   c.fillRect(0, RULER_H - 1, w, 1);
   const barPx = BAR * z;
   const every = Math.max(1, Math.ceil(36 / barPx));
-  c.font = `600 10px ${T.font}`;
+  c.font = `600 11px ${T.font}`;
   c.textBaseline = 'middle';
   c.textAlign = 'left';
   for (let b = Math.floor(sx / barPx); b * barPx - sx <= w; b++) {
     const x = Math.round(b * barPx - sx);
     const labelled = b % every === 0;
-    c.fillStyle = 'rgba(239, 231, 218, 0.26)';
+    c.fillStyle = T.rulerLine;
     c.fillRect(x, labelled ? 5 : 13, 1, RULER_H);
     if (labelled) {
-      c.fillStyle = b * BAR < L.patLen ? T.paper : T.dust2;
-      c.fillText(String(b + 1), x + 4, 10);
+      c.fillStyle = b * BAR < L.patLen ? T.text2 : T.text3;
+      c.fillText(String(b + 1), x + 5, 11);
     }
     if (BEAT * z >= 12) {
-      c.fillStyle = 'rgba(239, 231, 218, 0.13)';
+      c.fillStyle = T.hair;
       for (let i = 1; i < 4; i++) c.fillRect(Math.round(x + i * BEAT * z), 15, 1, RULER_H - 15);
     }
   }
   const ex = L.patLen * z - sx;
   if (ex >= 0 && ex <= w) {
-    c.fillStyle = T.lamp[1];
+    c.fillStyle = T.text2;
     c.beginPath();
     c.moveTo(ex, RULER_H - 1);
-    c.lineTo(ex - 7, RULER_H - 1);
-    c.lineTo(ex, RULER_H - 8);
+    c.lineTo(ex - 6, RULER_H - 1);
+    c.lineTo(ex, RULER_H - 7);
     c.fill();
   }
   if (playPos >= 0) {
     const x = playPos * z - sx;
-    c.fillStyle = T.paper;
+    c.save();
+    c.fillStyle = T.lamp;
+    c.shadowColor = T.lampGlow;
+    c.shadowBlur = 6;
     c.beginPath();
-    c.moveTo(x - 5, 0);
-    c.lineTo(x + 5, 0);
+    c.moveTo(x - 4.5, 0);
+    c.lineTo(x + 4.5, 0);
     c.lineTo(x, 7);
     c.fill();
+    c.restore();
   }
 }
 
@@ -750,26 +776,32 @@ function drawVelocity(canvas: HTMLCanvasElement | null, w: number, sx: number, L
   const c = prepareCanvas(canvas, w, VEL_H);
   if (!c) return;
   const z = L.zoom;
-  c.fillStyle = T.gridBg;
+  c.fillStyle = '#10141b';
   c.fillRect(0, 0, w, VEL_H);
-  c.fillStyle = T.seam;
+  c.fillStyle = T.hair;
   c.fillRect(0, 0, w, 1);
-  c.fillStyle = 'rgba(239, 231, 218, 0.07)';
+  c.fillStyle = 'rgba(255, 255, 255, 0.05)';
   c.fillRect(0, Math.round(VEL_BASE - DEFAULT_VEL * VEL_SPAN), w, 1);
   c.lineWidth = 1.5;
   for (const n of L.notes) {
     const x = Math.round(n.pos * z - sx) + 0.5;
     if (x < -4 || x > w + 4) continue;
     const top = VEL_BASE - n.vel * VEL_SPAN;
-    const color = L.selection.has(n.id) ? T.paper : L.color;
-    c.strokeStyle = color;
-    c.fillStyle = color;
+    const selected = L.selection.has(n.id);
+    c.save();
+    if (selected) {
+      c.shadowColor = T.lampGlow;
+      c.shadowBlur = 8;
+    }
+    c.strokeStyle = selected ? T.lamp : L.color;
+    c.fillStyle = selected ? T.lamp : L.color;
     c.beginPath();
     c.moveTo(x, VEL_BASE);
     c.lineTo(x, top);
     c.stroke();
     c.beginPath();
-    c.arc(x, top, 2.6, 0, Math.PI * 2);
+    c.arc(x, top, 3, 0, Math.PI * 2);
     c.fill();
+    c.restore();
   }
 }

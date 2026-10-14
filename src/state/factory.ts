@@ -4,17 +4,27 @@ import { DEFAULT_CHANNEL_VOLUME, DEFAULT_VEL, ROOT_KEY, makeMixer, makeTracks } 
 import { presetParams } from '../core/presets';
 import { defaultFxParams } from '../core/fxSpecs';
 import { STEP } from '../core/time';
-import type { Channel, FxSlot, FxType, Note, Pattern, Project } from '../core/types';
+import type { Channel, FxSlot, FxType, Note, Pattern, Project, SamplerParams } from '../core/types';
 import { SOUNDS_BY_ID } from '../audio/sounds';
+import { getUserSample, guessCutItself } from '../audio/userSamples';
+
+/** Sampler defaults for a built-in or imported sample. The name is undefined when the id is unknown. */
+export function samplerParams(sampleId: string): { name?: string; sampler: SamplerParams } {
+  const sound = SOUNDS_BY_ID.get(sampleId);
+  if (sound) return { name: sound.name, sampler: { sampleId, pitch: 0, cutItself: sound.category === '808s' } };
+  const user = getUserSample(sampleId);
+  if (user) return { name: user.name, sampler: { sampleId, sampleName: user.name, pitch: 0, cutItself: guessCutItself(user.name) } };
+  return { sampler: { sampleId, pitch: 0, cutItself: false } };
+}
 
 export function samplerChannel(sampleId: string, index: number, mixerTrack: number): Channel {
-  const sound = SOUNDS_BY_ID.get(sampleId);
+  const { name, sampler } = samplerParams(sampleId);
   return {
     id: uid('ch'),
-    name: sound?.name ?? 'Sampler',
+    name: name ?? 'Sampler',
     color: colorAt(index),
     type: 'sampler',
-    sampler: { sampleId, pitch: 0, cutItself: sound?.category === '808s' },
+    sampler,
     volume: DEFAULT_CHANNEL_VOLUME,
     pan: 0,
     muted: false,

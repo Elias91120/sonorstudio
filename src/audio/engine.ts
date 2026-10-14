@@ -5,6 +5,7 @@ import { useStudio, type StudioState } from '../state/store';
 import { AudioGraph } from './graph';
 import { getSound, loadSounds } from './soundBank';
 import { buildPatternTimeline, buildSongTimeline, collectWindow, type Timeline } from './timeline';
+import { userSamplesReady } from './userSamples';
 import { playSample, playSynth, triggerNote, type TriggerTarget, type Voice } from './voices';
 
 /** How far ahead notes are scheduled, in seconds. */
@@ -56,7 +57,8 @@ class Engine {
       this.timer = makeTimer(() => this.pump());
     }
     if (this.ctx.state === 'suspended') await this.ctx.resume();
-    await loadSounds();
+    // Imported sounds usually decode within a moment; a slow or stuck disk must not hold the transport.
+    await Promise.all([loadSounds(), userSamplesReady(1500)]);
   }
 
   private onState(s: StudioState, prev: StudioState) {

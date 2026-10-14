@@ -1,4 +1,5 @@
 import { renderSounds } from './sounds';
+import { getUserBuffer } from './userSamples';
 
 let buffers: Map<string, AudioBuffer> | null = null;
 let pending: Promise<Map<string, AudioBuffer>> | null = null;
@@ -13,7 +14,8 @@ export function loadSounds(): Promise<Map<string, AudioBuffer>> {
   return pending;
 }
 
-export const getSound = (id: string): AudioBuffer | null => buffers?.get(id) ?? null;
+/** A built-in sound or one the user imported; null while loading or when the sample is gone. */
+export const getSound = (id: string): AudioBuffer | null => buffers?.get(id) ?? getUserBuffer(id);
 
 export const soundsReady = () => buffers !== null;
 
