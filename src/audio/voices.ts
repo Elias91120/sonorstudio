@@ -1,7 +1,7 @@
 import { ROOT_KEY, velToGain } from '../core/project';
 import type { Channel, SynthParams } from '../core/types';
 import type { AudioGraph } from './graph';
-import { getSound } from './soundBank';
+import { samplerSound } from './soundBank';
 
 export interface Voice {
   start: number;
@@ -145,7 +145,7 @@ export function triggerNote(t: TriggerTarget, ch: Channel, key: number, vel: num
   if (!dest) return null;
   let voice: Voice | null = null;
   if (ch.type === 'sampler' && ch.sampler) {
-    const buf = getSound(ch.sampler.sampleId);
+    const buf = samplerSound(ch.sampler);
     if (!buf) return null;
     if (ch.sampler.cutItself) t.lastVoice.get(ch.id)?.kill(at);
     const rate = 2 ** ((key - ROOT_KEY + ch.sampler.pitch) / 12);

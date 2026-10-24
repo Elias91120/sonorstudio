@@ -4,12 +4,130 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Make beats in your browser: channel rack, piano roll, playlist and mixer, nothing to install." />
-    <meta name="theme-color" content="#15120f" />
-    <title>SonorStudio</title>
+    <meta name="description" content="SonorStudio is a free music studio in your browser: channel rack, piano roll, playlist and mixer. It opens .flp projects and your own drum kits. No account, nothing to install." />
+    <meta name="theme-color" content="#0c0f14" />
+    <meta property="og:title" content="SonorStudio, make beats in your browser" />
+    <meta property="og:description" content="A free music studio in a browser tab. Opens .flp projects and your own kits." />
+    <meta property="og:image" content="/demo/poster.jpg" />
+    <title>SonorStudio, make beats in your browser</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <header class="top">
+      <a class="brand" href="/" aria-label="SonorStudio home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="16" height="14" viewBox="0 0 16 14" fill="currentColor">
+            <rect x="0.5" y="3.5" width="2.8" height="7" rx="1.4" />
+            <rect x="4.6" y="0" width="2.8" height="14" rx="1.4" />
+            <rect x="8.7" y="1.4" width="2.8" height="11.2" rx="1.4" />
+            <rect x="12.8" y="4.2" width="2.8" height="5.6" rx="1.4" />
+          </svg>
+        </span>
+        SonorStudio
+      </a>
+      <a class="btn btn-small" href="/studio/">Open the beta</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <h1>Make beats in your browser.</h1>
+          <p class="lede">
+            Channel rack, piano roll, playlist and mixer, in one tab. It opens your <code>.flp</code> projects and your
+            own kits. Free, no account, nothing to install.
+          </p>
+          <div class="actions">
+            <a class="btn" href="/studio/">Open the beta</a>
+            <a class="btn btn-quiet" href="#demo">Watch the demo</a>
+          </div>
+        </div>
+
+        <figure class="grid-figure">
+          <div class="grid" id="grid" role="img" aria-label="Step sequencer playing a two-bar UK drill drum pattern at 148 BPM"></div>
+          <figcaption>
+            <span>Drill A, from a real project file</span>
+            <span class="bpm"><b>148</b> BPM</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="demo" id="demo">
+        <h2>One project file, opened in the browser</h2>
+        <p class="section-lede">
+          A UK drill beat made elsewhere, dropped into SonorStudio with its kit. Tempo, patterns, 808 notes and mixer
+          come with it.
+        </p>
+        <div class="player">
+          <video id="demo-video" playsinline preload="metadata" poster="/demo/poster.jpg">
+            <source src="/demo/sonorstudio-demo.mp4" type="video/mp4" />
+          </video>
+          <button class="play" id="demo-play" type="button">
+            <svg width="22" height="24" viewBox="0 0 22 24" aria-hidden="true"><path d="M3 2.6v18.8a1.4 1.4 0 0 0 2.1 1.2l15.4-9.4a1.4 1.4 0 0 0 0-2.4L5.1 1.4A1.4 1.4 0 0 0 3 2.6Z" fill="currentColor" /></svg>
+            Play the demo, sound on
+          </button>
+        </div>
+      </section>
+
+      <section class="windows">
+        <h2>Four windows, and the shortcuts you already use</h2>
+        <dl class="window-list">
+          <div>
+            <dt><kbd>F6</kbd> Channel rack</dt>
+            <dd>One row per sound. Paint steps, mute, solo, and send each channel to the mixer.</dd>
+          </div>
+          <div>
+            <dt><kbd>F7</kbd> Piano roll</dt>
+            <dd>Draw, move and stretch notes, with the other channels as ghost notes and a velocity lane.</dd>
+          </div>
+          <div>
+            <dt><kbd>F5</kbd> Playlist</dt>
+            <dd>Arrange your patterns into a song across 32 tracks, then press L to play it.</dd>
+          </div>
+          <div>
+            <dt><kbd>F9</kbd> Mixer</dt>
+            <dd>24 inserts with EQ, filter, drive, compressor, delay, reverb and limiter.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="bring">
+        <h2>Bring your projects and your sounds</h2>
+        <ol class="steps">
+          <li>
+            <h3>Drop a <code>.flp</code></h3>
+            <p>Tempo, channels, patterns, playlist and mixer come in. Plugins that only exist on your computer are listed, not guessed.</p>
+          </li>
+          <li>
+            <h3>Drop your kit</h3>
+            <p>A folder or a .zip. Each channel finds its sample by file name, and plays a built-in sound until then.</p>
+          </li>
+          <li>
+            <h3>Press Space</h3>
+            <p>It plays. Export a WAV, or a project file with its sounds inside to open it anywhere.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="free">
+        <h2>Free, and it stays free.</h2>
+        <p>
+          SonorStudio is in open beta: some things are still missing, nothing is locked. Your sounds and projects stay in
+          your browser, nothing is uploaded.
+        </p>
+        <a class="btn" href="/studio/">Open the beta</a>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>
+        Demo beat: drum patterns designed by
+        <a href="https://www.youtube.com/c/pavmusicproduction" target="_blank" rel="noreferrer">PAV Music Production</a>,
+        on the free
+        <a href="https://producergrind.com/products/gassed-free-uk-drill-drum-kit" target="_blank" rel="noreferrer">GASSED UK Drill Drum Kit</a>
+        by Producergrind.
+      </p>
+      <p>Made by <a href="https://3geeks.fr" target="_blank" rel="noreferrer">3Geeks</a>.</p>
+    </footer>
+
+    <script type="module" src="/src/landing/main.ts"></script>
   </body>
 </html>

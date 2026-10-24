@@ -293,11 +293,13 @@ function ChannelRow({ ch, pattern, steps, selected, mixerSize }: RowProps) {
         />
         <TrackNumber value={ch.mixerTrack} max={mixerSize - 1} onChange={(v) => setChannelTrack(ch.id, v)} />
         <button
-          className={`rack-name${missing ? ' is-missing' : ''}`}
+          className={`rack-name${missing ? (ch.sampler?.standIn ? ' is-standin' : ' is-missing') : ''}`}
           style={{ '--c': ch.color } as CSSProperties}
           data-hint={
             missing
-              ? `Sample missing: ${ch.sampler?.sampleName ?? ch.name}. Import it again, or pick another sample in the channel settings.`
+              ? ch.sampler?.standIn
+                ? `Sample missing: ${ch.sampler.sampleName ?? ch.name}. A built-in sound stands in until you import it; it links by name.`
+                : `Sample missing: ${ch.sampler?.sampleName ?? ch.name}. Import it again, or pick another sample in the channel settings.`
               : `${ch.name}: click for settings, right-click for more`
           }
           onClick={() => openChannelSettings(ch.id)}

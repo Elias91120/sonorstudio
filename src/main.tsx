@@ -5,6 +5,7 @@ import { engine } from './audio/engine';
 import { loadSounds } from './audio/soundBank';
 import { loadUserSamples } from './audio/userSamples';
 import { startAutosave } from './state/autosave';
+import { startRelinking } from './state/relink';
 import { useStudio } from './state/store';
 import './styles/app.css';
 import { App } from './ui/App';
@@ -13,6 +14,7 @@ import { guardFileDrops } from './ui/importSounds';
 void loadSounds();
 void loadUserSamples();
 startAutosave();
+startRelinking();
 guardFileDrops();
 
 // Browsers only start audio after a user gesture: the first click or key press unlocks it.

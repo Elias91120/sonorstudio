@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useStudio } from '../state/store';
 import { ChannelRack } from './ChannelRack';
 import { ChannelSettings, ChannelSettingsTitle } from './ChannelSettings';
+import { KitBanner } from './KitBanner';
 import { IconMixer, IconPiano, IconPlaylist, IconRack, IconWave } from './icons';
 import { Mixer } from './Mixer';
 import { PianoRoll } from './PianoRoll';
@@ -53,6 +54,7 @@ export function Workspace() {
           )}
         </>
       )}
+      <KitBanner />
     </main>
   );
 }

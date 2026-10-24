@@ -133,6 +133,72 @@ kbd {
   margin: 0;
 }
 
+.kit-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 900;
+  width: min(760px, calc(100% - 32px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 12px 12px 18px;
+  border-radius: var(--r-pop);
+  background: var(--overlay);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--shadow-pop), inset 0 1px 0 var(--glint);
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.45;
+  animation: kit-banner-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.kit-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.kit-banner strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.kit-banner a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.kit-banner a:hover {
+  text-decoration: underline;
+}
+
+.kit-banner-credit {
+  color: var(--text-3);
+}
+
+.kit-banner .kit-banner-cta {
+  flex: none;
+  padding: 8px 14px;
+  border-radius: var(--r-ctl);
+  background: var(--accent);
+  color: var(--on-color);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kit-banner .kit-banner-cta:hover {
+  text-decoration: none;
+  filter: brightness(1.08);
+}
+
+@keyframes kit-banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+
 /* Shared controls */
 
 .icon-btn {
@@ -1162,6 +1228,13 @@ kbd {
 
 .rack-name.is-missing {
   color: var(--hot);
+}
+
+/* Missing, but a built-in sound plays in its place: a note, not an error. */
+.rack-name.is-standin {
+  color: var(--text-2);
+  text-decoration: underline dotted var(--warn);
+  text-underline-offset: 3px;
 }
 
 .rack-row.is-drop .rack-name {

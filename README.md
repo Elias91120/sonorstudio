@@ -11,6 +11,8 @@ npm test         # tests du séquenceur et du modèle
 npm run build    # typecheck + build de prod dans dist/
 ```
 
+Le site a deux pages : la landing à la racine (`index.html`, `src/landing/`, sans React) et le studio sous `/studio/` (`studio/index.html`, `src/main.tsx`).
+
 Pile technique : Vite, React 19, TypeScript, Zustand avec Immer pour l'état et l'undo/redo, Web Audio API. Il n'y a ni backend ni dépendance audio externe.
 
 ## Ce qui marche aujourd'hui
@@ -22,11 +24,18 @@ Pile technique : Vite, React 19, TypeScript, Zustand avec Immer pour l'état et 
 - **Instruments** : un sampler (pitch, cut itself) et un synthé à 3 oscillateurs avec filtre, enveloppe et 8 presets.
 - **Sons** : 27 sons de batterie, de 808 et d'effets, tous synthétisés au chargement. Aucun sample n'est livré avec l'app.
 - **Ses propres sons** : la section « My sounds » du Browser accepte des fichiers audio (WAV, MP3, OGG, FLAC, AIFF, M4A… tout ce que le navigateur sait décoder), un dossier entier ou un `.zip` de kit, par le bouton Import sounds ou en les déposant sur le Browser. Les sous-dossiers d'un dossier ou d'un zip deviennent des dossiers de la bibliothèque. Déposer des fichiers sur le Channel Rack crée directement un channel par son, dans l'ordre du dépôt (sur une ligne précise : elle prend le premier fichier), en une seule étape d'annulation. Les sons sont gardés dans le navigateur (IndexedDB), identifiés par l'empreinte de leur contenu, donc réimporter un fichier ne le duplique jamais. Un `.sonor.zip` déposé comme sons apporte ses sons sous leurs vrais noms. Clic droit sur un son : renommer, supprimer. Limites : 25 Mo par fichier (8 Mo pour les formats compressés comme le MP3) et 3 minutes.
+- **Projets `.flp`** : « Open project file… » ou un dépôt n'importe où dans le studio ouvre un projet `.flp` (format publié, documenté par PyFLP) : tempo, channels (sample, volume, pan, piste mixer, pitch), patterns et notes, playlist, inserts du mixer (volume, pan, et les effets natifs qui ont un équivalent : limiter, EQ, soft clipper, compresseur, reverb, delay, filtre). Les plugins tiers sont listés dans la barre d'aide, pas devinés. Code : `src/core/flp.ts` (lecture) et `src/state/flpImport.ts` (conversion).
+- **Kit manquant** : un channel dont le sample n'est pas dans la bibliothèque garde le nom du fichier attendu et joue un son intégré proche (`standIn`, deviné d'après le nom). Dès qu'un son de même nom est importé (fichier, dossier, zip, déposé n'importe où), le channel s'y relie tout seul (`src/state/relink.ts`). Un bandeau dit quels sons manquent et, pour la démo, où télécharger le kit.
+- **Démo** : « UK Drill (patterns by PAV) », les deux patterns du `.flp` de PAV Music Production arrangés sur 16 mesures à 148 BPM, pour le GASSED UK Drill Drum Kit de Producergrind (gratuit). Les samples du kit ne sont pas livrés : l'app renvoie vers le téléchargement officiel. Les données des patterns sont dans `src/core/drillPatterns.ts`.
 - **Transport** : modes Pattern et Song (touche L), tempo modifiable par glisser, molette ou double-clic, swing.
 - **Clavier d'ordinateur en piano** : rangées Z…M et Q…P, par position physique des touches, donc ça marche aussi en AZERTY. Entrée MIDI disponible via Web MIDI.
 - **Sauvegarde et export** : sauvegarde automatique dans le navigateur, fichier projet `.sonor.json`, export WAV du morceau rendu hors-ligne. « Export project with sounds » produit un `.sonor.zip` qui embarque les sons importés que le projet utilise : il s'ouvre partout avec « Open project file… », qui remet les sons dans la bibliothèque avant de charger le projet. Un son supprimé de la bibliothèque laisse son channel en place, muet, avec « Sample missing » dans le rack.
 - **Undo/redo** : Ctrl+Z et Ctrl+Y.
 - **Fenêtres flottantes** façon FL : F5 Playlist, F6 Channel Rack, F7 Piano Roll, F8 Browser, F9 Mixer.
+
+## Vidéo de démo
+
+Le film de la landing (`public/demo/sonorstudio-demo.mp4`) est un projet Remotion dans `video/`, avec son propre `package.json`. `video/capture/` filme le vrai studio avec Playwright (dépôt du `.flp`, du kit, arrangement, lecture) et rend l'audio du beat avec l'export WAV de l'app ; `video/src/Demo.tsx` fait le montage. Les médias générés (captation, WAV, rendus) ne sont pas versionnés. Rendu : `npx remotion render Demo out/demo-master.mp4`, puis réencodage web avec ffmpeg (audio normalisé à -14 LUFS).
 
 ## Organisation du code
 
@@ -58,6 +67,6 @@ SonorStudio reproduit **la façon de travailler** de FL Studio, observée en l'u
 
 - Clips audio dans la playlist (poser un son importé directement sur une piste), enregistrement micro
 - Clips d'automation (volume, cutoff…)
-- Import des projets `.flp` en lecture : le format est documenté publiquement, notamment par le projet PyFLP
+- `.flp` : automations, clips audio de la playlist, plusieurs arrangements
 - Comptes, sauvegarde cloud et partage de projets par lien
 - Mixer : sends, routing entre inserts, plus d'effets

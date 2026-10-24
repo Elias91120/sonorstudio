@@ -1,10 +1,19 @@
 import { describeImport, importFiles, type ImportResult, type IncomingFile } from '../audio/userSamples';
 import { addSampleChannels } from '../state/actions';
+import { isFlpName, openFlpFile } from './fileActions';
 import { setHint } from './hint';
 
 /** Imports files into the library and tells the hint bar how it went. Never rejects. */
 export async function importSounds(files: Iterable<File | IncomingFile>): Promise<ImportResult | null> {
-  const list = Array.from(files, (f) => (f instanceof File ? { file: f } : f));
+  let list = Array.from(files, (f) => (f instanceof File ? { file: f } : f));
+  // An FL Studio project dropped with or without its sounds: the sounds go in first, so it finds them by name.
+  const flp = list.find((f) => isFlpName(f.file.name));
+  if (flp) {
+    list = list.filter((f) => !isFlpName(f.file.name));
+    const result = list.length ? await importSounds(list) : null;
+    await openFlpFile(flp.file);
+    return result && { ...result, ordered: [] };
+  }
   if (!list.length) return null;
   setHint(list.length === 1 ? `Importing ${list[0].file.name}…` : `Importing ${list.length} files…`);
   try {
@@ -68,6 +77,11 @@ export function guardFileDrops() {
     if (isFiles(e)) e.preventDefault();
   });
   window.addEventListener('drop', (e) => {
-    if (isFiles(e)) e.preventDefault();
+    // Drop zones handle their own drops first and mark them handled.
+    if (!isFiles(e) || e.defaultPrevented) return;
+    e.preventDefault();
+    // Outside the drop zones, files still go somewhere useful: an FL Studio project opens, sounds and kits go to the
+    // library (where a project missing them picks them up by name).
+    if (e.dataTransfer) void droppedFiles(e.dataTransfer).then(importSounds);
   });
 }

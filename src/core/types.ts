@@ -25,6 +25,8 @@ export interface SamplerParams {
   sampleId: string;
   /** Name of an imported sample, kept so the rack can say which one is missing after it was deleted. */
   sampleName?: string;
+  /** Built-in sound played while the sample is missing, for projects that arrive without their kit. */
+  standIn?: string;
   /** Semitones. */
   pitch: number;
   /** A new note stops the previous one (808s, open hats). */

@@ -1,6 +1,8 @@
 import { engine } from '../audio/engine';
 import { encodeWav, peakOf, renderProject } from '../audio/exportWav';
-import { importCandidates, loadUserSamples } from '../audio/userSamples';
+import { cleanName, importCandidates, loadUserSamples, useUserSamples } from '../audio/userSamples';
+import { FlpError, parseFlp } from '../core/flp';
+import { flpToProject } from '../state/flpImport';
 import { isProjectZip, packProject, PROJECT_ZIP_SUFFIX, unpackProject } from '../state/bundle';
 import { createDemoProject } from '../state/demo';
 import { createEmptyProject } from '../state/factory';
@@ -55,8 +57,9 @@ function pickFile(accept: string): Promise<File | null> {
 }
 
 export async function openProjectFile() {
-  const file = await pickFile('.json,.zip,application/json,application/zip');
+  const file = await pickFile('.json,.zip,.flp,application/json,application/zip');
   if (!file) return;
+  if (isFlpName(file.name)) return openFlpFile(file);
   try {
     if (isProjectZip(file)) {
       const bundle = unpackProject(new Uint8Array(await file.arrayBuffer()));
@@ -81,6 +84,29 @@ export async function openProjectFile() {
     setHint(`Opened ${p.name}.`);
   } catch {
     setHint(`${file.name} isn't a SonorStudio project file.`);
+  }
+}
+
+export const isFlpName = (name: string) => /\.flp$/i.test(name);
+
+/** An FL Studio project: its samples are found in the library by file name, the others play stand-ins until imported. */
+export async function openFlpFile(file: File) {
+  try {
+    const flp = parseFlp(new Uint8Array(await file.arrayBuffer()));
+    await loadUserSamples();
+    const byName = new Map(useUserSamples.getState().samples.map((s) => [s.name.toLowerCase(), s.id]));
+    const { project, missing, plugins } = flpToProject(flp, cleanName(file.name), (n) => byName.get(n.toLowerCase()) ?? null, cleanName);
+    engine.stop();
+    useStudio.getState().loadProject(project, project.clips.length ? 'song' : 'pattern');
+    let text = `Opened ${project.name} (.flp).`;
+    if (missing.length) {
+      const n = missing.length;
+      text += ` ${n} sample${n === 1 ? ' is' : 's are'} not in your library: built-in sounds stand in until you import ${n === 1 ? 'it' : 'the kit'}, then ${n === 1 ? 'it links' : 'they link'} by name.`;
+    }
+    if (plugins.length) text += ` Plugins left out: ${plugins.join(', ')}.`;
+    setHint(text);
+  } catch (err) {
+    setHint(err instanceof FlpError ? `${file.name} couldn't be read: ${err.message}.` : `${file.name} couldn't be opened.`);
   }
 }
 
